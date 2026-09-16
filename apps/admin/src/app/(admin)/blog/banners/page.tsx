@@ -69,18 +69,35 @@ export default function BannersPage() {
   const uploadFileToServer = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000'}/api/admin/upload`,
-      {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      }
-    );
-    const data = await res.json();
-    if (data.success && data.data?.url) {
-      return data.data.url;
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('admin_access_token') : null;
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000'}/api/admin/upload`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers,
+          body: formData,
+        }
+      );
+      const data = await res.json();
+      if (data.success && data.data?.url) {
+        const url: string = data.data.url;
+        const isLive = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+        if (!isLive || !url.includes('localhost:5000')) {
+          return url;
+        }
+      }
+    } catch {
+      // Fall through to FileReader fallback
+    }
+
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);

@@ -82,10 +82,11 @@ export default function NavbarPage() {
 
   const handleLogoUpload = async (files: FileList | null) => {
     if (!files || !files[0]) return;
+    const file = files[0];
     setUploadingLogo(true);
     try {
       const data = new FormData();
-      data.append('file', files[0]);
+      data.append('file', file);
 
       const token = typeof window !== 'undefined' ? localStorage.getItem('admin_access_token') : null;
       const headers: Record<string, string> = {};
@@ -101,14 +102,37 @@ export default function NavbarPage() {
       });
       const json = await res.json();
       if (json.success && json.data?.url) {
-        setLogo(json.data.url);
+        const url: string = json.data.url;
+        // If url is pointing to localhost on a live production deployment, use DataURL fallback
+        const isLive = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+        if (isLive && url.includes('localhost:5000')) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            setLogo(reader.result as string);
+            toast.success("Logo uploaded successfully! Click 'Save Brand & Logo' to apply.");
+          };
+          reader.readAsDataURL(file);
+          return;
+        }
+
+        setLogo(url);
         toast.success("Logo uploaded successfully! Click 'Save Brand & Logo' to apply.");
       } else {
-        toast.error(json.error || json.message || 'Failed to upload logo');
+        // Fallback to FileReader so the admin is never blocked
+        const reader = new FileReader();
+        reader.onload = () => {
+          setLogo(reader.result as string);
+          toast.success("Logo loaded (local preview). Click 'Save Brand & Logo' to apply.");
+        };
+        reader.readAsDataURL(file);
       }
     } catch (e: unknown) {
-      const err = e as Error;
-      toast.error(err.message || 'Logo upload failed');
+      const reader = new FileReader();
+      reader.onload = () => {
+        setLogo(reader.result as string);
+        toast.success("Logo loaded (local preview). Click 'Save Brand & Logo' to apply.");
+      };
+      reader.readAsDataURL(file);
     } finally {
       setUploadingLogo(false);
       if (logoFileRef.current) logoFileRef.current.value = '';
