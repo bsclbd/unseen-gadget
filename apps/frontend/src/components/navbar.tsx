@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, FormEvent, useEffect, useCallback } from "react";
+import { useState, FormEvent, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Search,
   User,
   ShoppingCart,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Menu,
   X,
   Heart,
@@ -30,18 +31,96 @@ interface NavLinkItem {
   order?: number;
 }
 
-/* ── Dropdown ───────────────────────────────────────────── */
-function SubMenu({ items, depth = 0, language = "en" }: { items: Category[]; depth?: number; language?: string }) {
+/* ── Floating SubMenu for Category Slider ───────────────── */
+function FloatingSubMenu({
+  items,
+  top,
+  left,
+  language = "en",
+  onClose,
+  onMouseEnter,
+  onMouseLeave,
+}: {
+  items: Category[];
+  top: number;
+  left: number;
+  language?: string;
+  onClose: () => void;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+}) {
   const [hovered, setHovered] = useState<string | null>(null);
   if (!items?.length) return null;
+
+  const isNearRightEdge = typeof window !== "undefined" && left + 440 > window.innerWidth;
+
   return (
-    <ul
-      className={
-        depth === 0
-          ? "dropdown-enter absolute left-0 top-full z-50 min-w-[220px] rounded-lg border border-border bg-card shadow-lg py-1.5"
-          : "absolute left-full top-0 z-50 min-w-[220px] rounded-lg border border-border bg-card shadow-lg py-1.5"
-      }
+    <div
+      style={{
+        position: "fixed",
+        top: `${top}px`,
+        left: `${left}px`,
+      }}
+      className="dropdown-enter z-50 min-w-[220px] rounded-lg border border-border bg-card shadow-xl py-1.5"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
+      <ul>
+        {items.map((item) => (
+          <li
+            key={item.id}
+            className="relative"
+            onMouseEnter={() => setHovered(item.id)}
+            onMouseLeave={() => setHovered(null)}
+          >
+            <Link
+              href={item.href}
+              onClick={onClose}
+              className="flex items-center justify-between gap-3 px-4 py-2 text-[13px] text-foreground transition-colors hover:bg-accent hover:text-[#182C61] dark:hover:text-primary"
+            >
+              <span className="truncate">{translateCategory(item.name, language as any)}</span>
+              {item.subcategories?.length ? (
+                <ChevronRight
+                  className={`h-3.5 w-3.5 shrink-0 text-muted-foreground ${isNearRightEdge ? "rotate-180" : ""}`}
+                />
+              ) : null}
+            </Link>
+            {hovered === item.id && item.subcategories?.length ? (
+              <SubMenu items={item.subcategories} depth={1} language={language} alignRight={isNearRightEdge} />
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/* ── Dropdown ───────────────────────────────────────────── */
+function SubMenu({
+  items,
+  depth = 0,
+  language = "en",
+  alignRight = false,
+}: {
+  items: Category[];
+  depth?: number;
+  language?: string;
+  alignRight?: boolean;
+}) {
+  const [hovered, setHovered] = useState<string | null>(null);
+  if (!items?.length) return null;
+
+  let posClass = "dropdown-enter absolute left-0 top-full z-50 min-w-[220px] rounded-lg border border-border bg-card shadow-lg py-1.5";
+  if (depth === 0 && alignRight) {
+    posClass = "dropdown-enter absolute right-0 top-full z-50 min-w-[220px] rounded-lg border border-border bg-card shadow-lg py-1.5";
+  } else if (depth > 0 && alignRight) {
+    posClass = "absolute right-full top-0 z-50 min-w-[220px] rounded-lg border border-border bg-card shadow-lg py-1.5";
+  } else if (depth > 0) {
+    posClass = "absolute left-full top-0 z-50 min-w-[220px] rounded-lg border border-border bg-card shadow-lg py-1.5";
+  }
+
+  return (
+    <ul className={posClass}>
       {items.map((item) => (
         <li
           key={item.id}
@@ -55,11 +134,11 @@ function SubMenu({ items, depth = 0, language = "en" }: { items: Category[]; dep
           >
             <span className="truncate">{translateCategory(item.name, language as any)}</span>
             {item.subcategories?.length ? (
-              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <ChevronRight className={`h-3.5 w-3.5 shrink-0 text-muted-foreground ${alignRight ? "rotate-180" : ""}`} />
             ) : null}
           </Link>
           {hovered === item.id && item.subcategories?.length ? (
-            <SubMenu items={item.subcategories} depth={depth + 1} language={language} />
+            <SubMenu items={item.subcategories} depth={depth + 1} language={language} alignRight={alignRight} />
           ) : null}
         </li>
       ))}
@@ -89,33 +168,117 @@ function HandsetIcon({ className = "h-6 w-6 text-gray-700" }: { className?: stri
 /* ── Navbar ─────────────────────────────────────────────── */
 export function Navbar() {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [navLinks, setNavLinks] = useState<NavLinkItem[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [cartCount, setCartCount] = useState(0);
   const [cartTotal, setCartTotal] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
-  const [logoUrl, setLogoUrl] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("ug_cached_logo") || null;
-    }
-    return null;
-  });
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoError, setLogoError] = useState(false);
-  const [storeName, setStoreName] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("ug_cached_store_name") || "";
-    }
-    return "";
-  });
+  const [storeName, setStoreName] = useState<string>("");
   const [isLoaded, setIsLoaded] = useState(false);
   const [supportPhone, setSupportPhone] = useState<string>("");
   const [supportLabel, setSupportLabel] = useState<string>("Support");
   const { data: session } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const hydrated = useHydrated();
   const { t, language } = useTranslation();
+
+  const sliderRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<{
+    id: string;
+    subcategories: Category[];
+    top: number;
+    left: number;
+  } | null>(null);
+
+  const checkScrollButtons = useCallback(() => {
+    if (!sliderRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = sliderRef.current;
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    checkScrollButtons();
+    const el = sliderRef.current;
+    if (!el) return;
+
+    el.addEventListener("scroll", checkScrollButtons, { passive: true });
+    window.addEventListener("resize", checkScrollButtons);
+
+    const ro = new ResizeObserver(() => {
+      checkScrollButtons();
+    });
+    ro.observe(el);
+
+    return () => {
+      el.removeEventListener("scroll", checkScrollButtons);
+      window.removeEventListener("resize", checkScrollButtons);
+      ro.disconnect();
+    };
+  }, [checkScrollButtons, categories]);
+
+  const scrollSlider = (direction: "left" | "right") => {
+    if (!sliderRef.current) return;
+    const distance = 280;
+    sliderRef.current.scrollBy({
+      left: direction === "left" ? -distance : distance,
+      behavior: "smooth",
+    });
+    if (activeDropdown) setActiveDropdown(null);
+  };
+
+  const onWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (!sliderRef.current) return;
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      const { scrollWidth, clientWidth } = sliderRef.current;
+      if (scrollWidth > clientWidth) {
+        sliderRef.current.scrollLeft += e.deltaY;
+        if (activeDropdown) setActiveDropdown(null);
+      }
+    }
+  };
+
+  const handleItemMouseEnter = (cat: Category, element: HTMLElement) => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    if (!cat.subcategories?.length) {
+      setActiveDropdown(null);
+      return;
+    }
+    const rect = element.getBoundingClientRect();
+    const dropdownWidth = 220;
+    const maxLeft = typeof window !== "undefined" ? window.innerWidth - dropdownWidth - 16 : rect.left;
+    const left = Math.max(16, Math.min(rect.left, maxLeft));
+
+    setActiveDropdown({
+      id: cat.id,
+      subcategories: cat.subcategories,
+      top: rect.bottom + 2,
+      left,
+    });
+  };
+
+  const handleItemMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setActiveDropdown(null);
+    }, 180);
+  };
+
+  const handleDropdownMouseEnter = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+  };
+
+  const handleDropdownMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setActiveDropdown(null);
+    }, 180);
+  };
 
   const fetchCartAndWishlist = useCallback(() => {
     apiRequest("/cart/current")
@@ -140,6 +303,19 @@ export function Navbar() {
   }, []);
 
   useEffect(() => {
+    // 0. Load cached logo and store name immediately upon client hydration
+    if (typeof window !== "undefined") {
+      const cachedLogo = localStorage.getItem("ug_cached_logo");
+      if (cachedLogo) {
+        setLogoUrl(cachedLogo);
+        setLogoError(false);
+      }
+      const cachedName = localStorage.getItem("ug_cached_store_name");
+      if (cachedName) {
+        setStoreName(cachedName);
+      }
+    }
+
     // 1. Fetch Store Identity & Logo from CMS General
     const p1 = apiRequest("/cms/general")
       .then((res) => {
@@ -240,7 +416,12 @@ export function Navbar() {
         </button>
 
         {/* 1. BRAND LOGO (Left: Exact Navy Color) */}
-        <Link href="/" aria-label={storeName || "Home"} className="shrink-0 flex items-center pr-1 sm:pr-2 min-h-[36px] min-w-[100px]">
+        <Link
+          href="/"
+          aria-label={storeName || "Home"}
+          suppressHydrationWarning
+          className="shrink-0 flex items-center pr-1 sm:pr-2 min-h-[36px] min-w-[100px]"
+        >
           {logoUrl && !logoError ? (
             <img
               src={logoUrl}
@@ -379,35 +560,85 @@ export function Navbar() {
         </form>
       </div>
 
-      {/* ═══ CATEGORY NAV (Bottom Bar) ════════════════════════ */}
-      <nav className="border-t border-gray-200 dark:border-border bg-white dark:bg-card">
-        <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
-          {/* Desktop Category Row */}
-          <ul className="hidden h-10 items-center md:flex gap-2">
-            {(categories as Category[]).map((cat) => (
-              <li
-                key={cat.id}
-                className="relative h-full"
-                onMouseEnter={() => setActiveCategory(cat.id)}
-                onMouseLeave={() => setActiveCategory(null)}
+      {/* ═══ CATEGORY NAV (Bottom Slider Bar) ════════════════ */}
+      <nav className="relative border-t border-gray-200 dark:border-border bg-white dark:bg-card">
+        <div className="relative mx-auto max-w-[1440px] px-3 sm:px-6 lg:px-8">
+          {/* Left Arrow with Fade Gradient */}
+          {canScrollLeft && (
+            <div className="absolute left-3 sm:left-6 lg:left-8 top-0 bottom-0 z-20 flex items-center pr-3 bg-gradient-to-r from-white via-white/95 to-transparent dark:from-card dark:via-card/95 dark:to-transparent">
+              <button
+                type="button"
+                onClick={() => scrollSlider("left")}
+                aria-label="Scroll categories left"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white dark:bg-card border border-border shadow-md text-foreground hover:bg-gray-100 dark:hover:bg-accent hover:text-[#182C61] dark:hover:text-primary transition-all duration-150 active:scale-90 cursor-pointer"
               >
+                <ChevronLeft className="h-4 w-4 stroke-[2.2]" />
+              </button>
+            </div>
+          )}
+
+          {/* Desktop Category Slider */}
+          <div
+            ref={sliderRef}
+            onWheel={onWheel}
+            className="hidden md:flex h-10 items-center overflow-x-auto scroll-smooth gap-1 sm:gap-2 select-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {categories.map((cat) => {
+              const isActive =
+                pathname === cat.href || (Boolean(pathname?.startsWith(cat.href + "/")) && cat.href !== "/");
+              const isHovered = activeDropdown?.id === cat.id;
+              return (
                 <Link
+                  key={cat.id}
                   href={cat.href}
-                  className={`flex h-full items-center gap-1 whitespace-nowrap px-3 text-[13px] font-semibold transition-colors ${
-                    activeCategory === cat.id
+                  onMouseEnter={(e) => handleItemMouseEnter(cat, e.currentTarget)}
+                  onMouseLeave={handleItemMouseLeave}
+                  className={`flex h-full items-center gap-1 whitespace-nowrap px-3 text-[13px] font-semibold transition-colors shrink-0 ${
+                    isActive || isHovered
                       ? "text-[#182C61] dark:text-primary font-bold"
                       : "text-gray-700 dark:text-gray-300 hover:text-[#182C61] dark:hover:text-primary"
                   }`}
                 >
-                  {translateCategory(cat.name, language)}
+                  <span>{translateCategory(cat.name, language)}</span>
+                  {cat.subcategories?.length ? (
+                    <ChevronDown
+                      className={`h-3 w-3 text-muted-foreground transition-transform duration-150 ${
+                        isHovered ? "rotate-180 text-[#182C61] dark:text-primary" : ""
+                      }`}
+                    />
+                  ) : null}
                 </Link>
-                {activeCategory === cat.id && cat.subcategories?.length ? (
-                  <SubMenu items={cat.subcategories} depth={0} language={language} />
-                ) : null}
-              </li>
-            ))}
-          </ul>
+              );
+            })}
+          </div>
+
+          {/* Right Arrow with Fade Gradient */}
+          {canScrollRight && (
+            <div className="absolute right-3 sm:right-6 lg:right-8 top-0 bottom-0 z-20 flex items-center pl-3 bg-gradient-to-l from-white via-white/95 to-transparent dark:from-card dark:via-card/95 dark:to-transparent">
+              <button
+                type="button"
+                onClick={() => scrollSlider("right")}
+                aria-label="Scroll categories right"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white dark:bg-card border border-border shadow-md text-foreground hover:bg-gray-100 dark:hover:bg-accent hover:text-[#182C61] dark:hover:text-primary transition-all duration-150 active:scale-90 cursor-pointer"
+              >
+                <ChevronRight className="h-4 w-4 stroke-[2.2]" />
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Floating SubMenu Portal */}
+        {activeDropdown && (
+          <FloatingSubMenu
+            items={activeDropdown.subcategories}
+            top={activeDropdown.top}
+            left={activeDropdown.left}
+            language={language}
+            onClose={() => setActiveDropdown(null)}
+            onMouseEnter={handleDropdownMouseEnter}
+            onMouseLeave={handleDropdownMouseLeave}
+          />
+        )}
 
         {/* Mobile drawer */}
         {mobileOpen && (
