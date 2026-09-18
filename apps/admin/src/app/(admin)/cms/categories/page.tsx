@@ -83,7 +83,7 @@ export default function FeaturedCategoriesCmsPage() {
   useEffect(() => {
     Promise.all([
       apiRequest("/cms/featured-categories").catch(() => ({ data: null })),
-      apiRequest("/categories").catch(() => ({ data: [] })),
+      apiRequest("/admin/categories").catch(() => ({ data: [] })),
     ])
       .then(([cmsRes, catRes]) => {
         if (cmsRes?.data) {

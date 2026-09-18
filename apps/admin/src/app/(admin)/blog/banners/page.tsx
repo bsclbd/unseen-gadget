@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Plus, Eye } from 'lucide-react';
+import { Plus, Eye, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { PageHeader } from '@/components/layout/page-header';
@@ -32,6 +32,7 @@ export default function BannersPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Banner | null>(null);
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
 
   // Form Fields
   const [title, setTitle] = useState('');
@@ -48,13 +49,13 @@ export default function BannersPage() {
     const rawData = (bannersRes as any)?.data ?? bannersRes;
     if (Array.isArray(rawData)) {
       const normalized: Banner[] = rawData.map((b: Partial<Banner>, index: number) => ({
-        id: b.id || `banner-${index + 1}`,
+        id: b.id || `banner-${b.placement || 'slider'}-${index + 1}`,
         title: b.title || '',
         subtitle: b.subtitle || '',
         image: b.image || '',
         cta: b.cta || 'Shop Now',
         href: b.href || '/products',
-        placement: (b.placement as 'slider' | 'side') || (index >= 3 ? 'side' : 'slider'),
+        placement: (b.placement as 'slider' | 'side') || 'slider',
         status: (b.status as 'Active' | 'Draft') || 'Active',
       }));
       setBanners(normalized);
@@ -193,7 +194,8 @@ export default function BannersPage() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    const updatedList = banners.filter((b) => b.id !== deleteTarget.id);
+    const targetId = deleteTarget.id;
+    const updatedList = banners.filter((b) => b.id !== targetId);
     try {
       await updateBannersMutation.mutateAsync(updatedList);
       setBanners(updatedList);
@@ -201,6 +203,17 @@ export default function BannersPage() {
       toast.success('Banner deleted successfully');
     } catch (err: any) {
       toast.error(err?.message || 'Failed to delete banner');
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      await updateBannersMutation.mutateAsync([]);
+      setBanners([]);
+      setConfirmClearAll(false);
+      toast.success('All banners removed successfully');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to remove all banners');
     }
   };
 
@@ -233,6 +246,15 @@ export default function BannersPage() {
             >
               <Eye className="h-4 w-4" /> View Live Storefront
             </a>
+            {!isEditing && banners.length > 0 && (
+              <Button
+                variant="outline"
+                className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                onClick={() => setConfirmClearAll(true)}
+              >
+                <Trash2 className="mr-1.5 h-4 w-4" /> Remove All Banners
+              </Button>
+            )}
             {!isEditing && (
               <Button onClick={() => openAdd('slider')}>
                 <Plus className="mr-1.5 h-4 w-4" /> Add New Banner
@@ -289,6 +311,17 @@ export default function BannersPage() {
         confirmLabel="Delete Banner"
         destructive
         onConfirm={handleDelete}
+      />
+
+      {/* Clear All Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmClearAll}
+        onOpenChange={setConfirmClearAll}
+        title="Remove All Banners"
+        description="Are you sure you want to remove ALL homepage banners? This will clear both slider slides and promo cards immediately from the storefront."
+        confirmLabel="Remove All"
+        destructive
+        onConfirm={handleClearAll}
       />
     </div>
   );

@@ -235,11 +235,14 @@ export const cmsJobUpdateSchema = cmsJobSchema.partial();
 export const cmsPageUpdateSchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
-  status: z.enum(["DRAFT", "PUBLISHED"]).optional(),
+  status: z
+    .enum(["DRAFT", "PUBLISHED", "draft", "published"])
+    .transform((val) => val.toUpperCase() as "DRAFT" | "PUBLISHED")
+    .optional(),
   seo: z.unknown().optional(),
   blocks: z.unknown().optional(),
   content: z.unknown().optional(),
-  lastUpdated: isoDate.optional(),
+  lastUpdated: z.union([isoDate, z.string(), z.null()]).optional(),
 });
 
 export const cmsSettingValueSchema = z.union([

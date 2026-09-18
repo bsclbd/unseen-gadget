@@ -1,11 +1,11 @@
 import type { Request, Response } from "express";
 import { prisma } from "@unseen-gadget/database";
 import { ApiResponseUtil } from "../utils/api-response";
-import { BadRequestError, NotFoundError } from "../utils/errors";
+import { BadRequestError, NotFoundError, UnauthorizedError } from "../utils/errors";
 import { asyncHandler } from "../utils/async-handler";
 
 export const createReview = asyncHandler(async (req: Request, res: Response) => {
-  const { productId, rating, comment, name, email } = req.body;
+  const { productId, rating, comment } = req.body;
 
   if (!productId || !rating) {
     throw new BadRequestError("Product ID and rating are required");
@@ -26,25 +26,9 @@ export const createReview = asyncHandler(async (req: Request, res: Response) => 
     throw new NotFoundError("Product not found");
   }
 
-  let userId = req.user?.id;
+  const userId = req.user?.id;
   if (!userId) {
-    const reviewerEmail = (email || `customer-${Date.now()}@unseengadget.com`).toLowerCase().trim();
-    const reviewerName = name?.trim() || "Verified Customer";
-
-    let customer = await prisma.user.findFirst({
-      where: { email: reviewerEmail },
-    });
-
-    if (!customer) {
-      customer = await prisma.user.create({
-        data: {
-          email: reviewerEmail,
-          name: reviewerName,
-          status: "ACTIVE",
-        },
-      });
-    }
-    userId = customer.id;
+    throw new UnauthorizedError("You must be logged in to submit a review");
   }
 
   const existingReview = await prisma.review.findFirst({

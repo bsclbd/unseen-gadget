@@ -64,7 +64,12 @@ export default function ProductDetails({ product }: { product: ProductDetailsDat
   const [wishlistLoading, setWishlistLoading] = useState(false);
 
   // Review states
-  const [reviewsList, setReviewsList] = useState<any[]>([]);
+  const [reviewsList, setReviewsList] = useState<any[]>(() => {
+    if (Array.isArray(product.reviewSummary?.items)) {
+      return product.reviewSummary.items;
+    }
+    return [];
+  });
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [supportPhone, setSupportPhone] = useState<string>("");
 
@@ -100,8 +105,10 @@ export default function ProductDetails({ product }: { product: ProductDetailsDat
   }, [product.id]);
 
   useEffect(() => {
-    fetchReviews();
-  }, [fetchReviews]);
+    if (!product.reviewSummary?.items || product.reviewSummary.items.length === 0) {
+      fetchReviews();
+    }
+  }, [fetchReviews, product.reviewSummary]);
 
   useEffect(() => {
     if (!session?.user || !product.id) return;

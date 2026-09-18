@@ -8,7 +8,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
   try {
     const res = await fetch(`${API_BASE}/api/products/${slug}`, {
-      cache: "no-store",
+      next: { revalidate: 30 },
     });
 
     if (!res.ok) {

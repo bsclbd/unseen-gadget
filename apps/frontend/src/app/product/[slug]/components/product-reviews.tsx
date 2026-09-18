@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   Star,
   CheckCircle2,
@@ -50,6 +52,8 @@ export function ProductReviews({
   onReviewSubmitted,
   t,
 }: ProductReviewsProps) {
+  const { data: session } = useSession();
+  const router = useRouter();
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
@@ -58,10 +62,26 @@ export function ProductReviews({
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
 
+  const handleOpenReviewModal = () => {
+    if (!session?.user) {
+      toast.error("Please log in to write a review / রিভিউ দিতে অনুগ্রহ করে প্রথমে লগইন করুন");
+      const currentPath = typeof window !== "undefined" ? window.location.pathname : "/";
+      router.push(`/login?callbackUrl=${encodeURIComponent(currentPath)}`);
+      return;
+    }
+    setReviewerName(session.user.name || "");
+    setReviewerEmail(session.user.email || "");
+    setReviewModalOpen(true);
+  };
+
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reviewerName.trim() || !reviewComment.trim()) {
-      toast.error("Please fill in your name and review");
+    if (!session?.user) {
+      toast.error("Please log in to submit a review");
+      return;
+    }
+    if (!reviewComment.trim()) {
+      toast.error("Please fill in your review");
       return;
     }
 
@@ -139,7 +159,7 @@ export function ProductReviews({
         <div className="flex sm:flex-col justify-end">
           <button
             type="button"
-            onClick={() => setReviewModalOpen(true)}
+            onClick={handleOpenReviewModal}
             className="btn-primary flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold shadow-md shadow-primary/20"
           >
             <Star className="h-4 w-4 fill-white" />
@@ -206,7 +226,7 @@ export function ProductReviews({
           </p>
           <button
             type="button"
-            onClick={() => setReviewModalOpen(true)}
+            onClick={handleOpenReviewModal}
             className="btn-primary mt-4 inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-xs font-bold shadow-md shadow-primary/20"
           >
             <Star className="h-3.5 w-3.5 fill-white" />
@@ -273,29 +293,18 @@ export function ProductReviews({
                 </span>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Your Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={reviewerName}
-                  onChange={(e) => setReviewerName(e.target.value)}
-                  placeholder="e.g. John Doe"
-                  className="h-10 w-full rounded-xl border border-border bg-background px-3.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">
-                  Your Email <span className="text-[10px] text-muted-foreground">(optional)</span>
-                </label>
-                <input
-                  type="email"
-                  value={reviewerEmail}
-                  onChange={(e) => setReviewerEmail(e.target.value)}
-                  placeholder="e.g. john@example.com"
-                  className="h-10 w-full rounded-xl border border-border bg-background px-3.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
+              {/* Verified Logged-in Customer Badge */}
+              <div className="flex items-center gap-2.5 rounded-xl bg-primary/5 p-3 border border-primary/20">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                  {(session?.user?.name || "U").charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-foreground truncate">{session?.user?.name || "Verified Customer"}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{session?.user?.email}</p>
+                </div>
+                <span className="flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+                  <CheckCircle2 className="h-3 w-3" /> Logged In
+                </span>
               </div>
 
               <div className="space-y-1.5">
