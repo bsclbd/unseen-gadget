@@ -109,11 +109,11 @@ export function BannerFormCard({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-700">Button CTA Text</label>
+              <label className="text-xs font-semibold text-gray-700">Button CTA Text (Optional)</label>
               <Input
                 value={cta}
                 onChange={(e) => setCta(e.target.value)}
-                placeholder="e.g. Go Shopping / Shop Now"
+                placeholder="Leave blank for no button (e.g. Shop Now)"
               />
             </div>
             <div className="space-y-1.5">

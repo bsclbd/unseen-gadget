@@ -53,7 +53,7 @@ export default function BannersPage() {
         title: b.title || '',
         subtitle: b.subtitle || '',
         image: b.image || '',
-        cta: b.cta || 'Shop Now',
+        cta: b.cta ?? '',
         href: b.href || '/products',
         placement: (b.placement as 'slider' | 'side') || 'slider',
         status: (b.status as 'Active' | 'Draft') || 'Active',
@@ -133,7 +133,7 @@ export default function BannersPage() {
     setTitle('');
     setSubtitle('');
     setImage('');
-    setCta('Shop Now');
+    setCta('');
     setHref('/products');
     setPlacement(defaultPlacement);
     setStatus('Active');
@@ -165,7 +165,7 @@ export default function BannersPage() {
     if (editingBanner) {
       updatedList = banners.map((b) =>
         b.id === editingBanner.id
-          ? { ...b, title, subtitle, image, cta, href, placement, status }
+          ? { ...b, title, subtitle, image, cta: cta.trim(), href, placement, status }
           : b
       );
     } else {
@@ -174,7 +174,7 @@ export default function BannersPage() {
         title,
         subtitle,
         image,
-        cta: cta || 'Shop Now',
+        cta: cta.trim(),
         href: href || '/products',
         placement,
         status,

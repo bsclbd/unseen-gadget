@@ -96,7 +96,7 @@ export default function Home() {
         id: b.id || `banner-${index + 1}`,
         title: b.title || "",
         subtitle: b.subtitle || "",
-        cta: b.cta || "Shop Now",
+        cta: b.cta ?? "",
         href: b.href || "/products",
         image: b.image || "",
         placement: b.placement,
